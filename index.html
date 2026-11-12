@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#173b63">
+<title>Mourya's APPSC Group 1 Tracker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f5f9;color:#172033;font:15px Arial}
+header{background:#173b63;color:white;padding:20px}
+main{max-width:850px;margin:auto;padding:14px}
+nav{display:flex;gap:6px;overflow:auto;margin-bottom:12px}
+button{padding:10px;border:0;border-radius:8px;background:#dbeafe;color:#173b63;font-weight:bold}
+nav button{white-space:nowrap}
+.active,.primary{background:#173b63;color:white}
+.card{background:white;padding:15px;border-radius:13px;margin-bottom:12px}
+h2{font-size:18px}
+input,select,textarea{width:100%;padding:11px;margin:6px 0 12px;border:1px solid #cbd5e1;border-radius:8px}
+.stat{display:inline-block;background:#eaf1fa;padding:12px;margin:3px;border-radius:8px}
+.panel{display:none}.panel.show{display:block}
+.slot{padding:10px;border-bottom:1px solid #ddd}
+.small{color:#64748b;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+<h2>Mourya's APPSC Group 1 Tracker</h2>
+<p>Personal Study Management</p>
+</header>
+<main>
+<nav>
+<button onclick="show('home')">Home</button>
+<button onclick="show('plan')">Timetable</button>
+<button onclick="show('timer')">Study Timer</button>
+<button onclick="show('syllabus')">Syllabus</button>
+<button onclick="show('mcq')">MCQ Tests</button>
+<button onclick="show('reports')">Reports</button>
+</nav>
+
+<section id="home" class="panel show">
+<div class="card">
+<h2>Today's Dashboard</h2>
+<div class="stat">Study time: <b id="todayHours">0 min</b></div>
+<div class="stat">Syllabus: <b id="syllPct">0%</b></div>
+<div class="stat">MCQ accuracy: <b id="accuracy">0%</b></div>
+<p>Welcome to your APPSC Group 1 preparation tracker.</p>
+</div>
+</section>
+
+<section id="plan" class="panel">
+<div class="card">
+<h2>Editable Timetable</h2>
+<label>Select day</label>
+<select id="day">
+<option>Monday</option><option>Tuesday</option>
+<option>Wednesday</option><option>Thursday</option>
+<option>Friday</option><option>Saturday</option><option>Sunday</option>
+</select>
+<label>Start time</label><input id="start" type="time">
+<label>End time</label><input id="end" type="time">
+<label>Subject / Task</label><input id="task" placeholder="Example: Indian Polity">
+<button class="primary" onclick="addSlot()">Add timetable slot</button>
+<div id="slots"></div>
+</div>
+</section>
+
+<section id="timer" class="panel">
+<div class="card">
+<h2>Study Timer</h2>
+<input id="timerTask" placeholder="Subject name">
+<h1 id="clock">00:00:00</h1>
+<button class="primary" onclick="startTimer()">Start</button>
+<button onclick="pauseTimer()">Pause</button>
+<button onclick="finishTimer()">Finish & Save</button>
+<p id="timerMsg" class="small">Timer stopped</p>
+</div>
+</section>
+
+<section id="syllabus" class="panel">
+<div class="card">
+<h2>Subject-wise Syllabus</h2>
+<div id="topics"></div>
+</div>
+</section>
+
+<section id="mcq" class="panel">
+<div class="card">
+<h2>MCQ Test Record</h2>
+<label>Test / Subject</label><input id="testName">
+<label>Questions attempted</label><input id="attempted" type="number" min="1">
+<label>Correct answers</label><input id="correct" type="number" min="0">
+<button class="primary" onclick="saveTest()">Save Test</button>
+<div id="testList"></div>
+</div>
+</section>
+
+<section id="reports" class="panel">
+<div class="card">
+<h2>Progress Reports</h2>
+<p>Total study time: <b id="totalHours">0 hours</b></p>
+<p>Timetable slots completed: <b id="slotCount">0</b></p>
+<p>MCQ accuracy: <b id="reportAccuracy">0%</b></p>
+<p>Syllabus completion: <b id="reportSyllabus">0%</b></p>
+<button onclick="backup()">Export Backup</button>
+<button onclick="document.getElementById('restore').click()">Import Backup</button>
+<input id="restore" type="file" accept=".json" hidden onchange="restoreBackup(event)">
+</div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let data=JSON.parse(localStorage.getItem('mouryaTracker')||'null')||{
+slots:[],done:[],topics:{},tests:[],seconds:0
+};
+function save(){localStorage.setItem('mouryaTracker',JSON.stringify(data));update()}
+function show(id){
+document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+$(id).classList.add('show');
+}
+function addSlot(){
+let d=$('day').value,s=$('start').value,e=$('end').value,t=$('task').value.trim();
+if(!s||!e||!t||e<=s){alert('Enter valid time and task');return}
+data.slots.push({d,s,e,t});
+$('task').value='';save();renderSlots();
+}
+function renderSlots(){
+$('slots').innerHTML=data.slots.map((x,i)=>
+`<div class="slot"><b>${x.d} ${x.s}-${x.e}</b><br>${x.t}
+<br><label><input style="width:auto" type="checkbox" ${data.done.includes(i)?'checked':''} onchange="toggleDone(${i},this.checked)"> Completed</label>
+<button onclick="deleteSlot(${i})">Delete</button></div>`).join('');
+}
+function toggleDone(i,v){
+if(v&&!data.done.includes(i))data.done.push(i);
+if(!v)data.done=data.done.filter(x=>x!==i);
+save();
+}
+function deleteSlot(i){
+data.slots.splice(i,1);
+data.done=data.done.filter(x=>x!==i).map(x=>x>i?x-1:x);
+save();renderSlots();
+}
+let timer=null,last=0,elapsed=0;
+function startTimer(){
+if(timer)return;
+last=Date.now();
+timer=setInterval(()=>{
+elapsed+=Math.floor((Date.now()-last)/1000);
+last=Date.now();clock();
+},1000);
+$('timerMsg').textContent='Timer running';
+}
+function pauseTimer(){
+if(!timer)return;
+clearInterval(timer);timer=null;
+elapsed+=Math.floor((Date.now()-last)/1000);
+clock();$('timerMsg').textContent='Paused';
+}
+function finishTimer(){
+pauseTimer();
+data.seconds+=elapsed;
+elapsed=0;clock();save();
+$('timerMsg').textContent='Study time saved';
+}
+function clock(){
+let n=elapsed+(timer?Math.floor((Date.now()-last)/1000):0);
+$('clock').textContent=
+[String(Math.floor(n/3600)).padStart(2,'0'),
+String(Math.floor(n%3600/60)).padStart(2,'0'),
+String(n%60).padStart(2,'0')].join(':');
+}
+const subjects={
+History:['Ancient India','Medieval India','Modern India','Art and Culture'],
+Polity:['Constitution','Fundamental Rights','Parliament','Judiciary','Federalism','Governance'],
+Economy:['Basic Concepts','Budget','Inflation','Banking','Agriculture'],
+Geography:['Physical Geography','Indian Geography','World Geography'],
+Environment:['Ecology','Biodiversity','Climate Change'],
+Science:['Space','Biotechnology','Artificial Intelligence'],
+AndhraPradesh:['AP History','AP Geography','AP Economy','AP Governance'],
+Ethics:['Human Values','Attitude','Integrity','Case Studies']
+};
+function renderTopics(){
+let html='';
+Object.entries(subjects).forEach(([s,arr])=>{
+html+=`<h3>${s}</h3>`;
+arr.forEach(t=>{
+let k=s+'-'+t;
+html+=`<label><input style="width:auto" type="checkbox" ${data.topics[k]?'checked':''} onchange="data.topics['${k}']=this.checked;save()">${t}</label><br>`;
+});
+});
+$('topics').innerHTML=html;
+}
+function saveTest(){
+let n=$('testName').value.trim(),a=+$('attempted').value,c=+$('correct').value;
+if(!n||a<1||c<0||c>a){alert('Enter valid test details');return}
+data.tests.push({n,a,c,date:new Date().toISOString().slice(0,10)});
+$('testName').value='';$('attempted').value='';$('correct').value='';
+save();renderTests();
+}
+function renderTests(){
+$('testList').innerHTML=data.tests.map(t=>
+`<p>${t.date} — ${t.n}: ${t.c}/${t.a} (${(t.c/t.a*100).toFixed(1)}%)</p>`).join('');
+}
+function update(){
+let total=Object.values(data.topics).filter(Boolean).length;
+let count=Object.values(subjects).flat().length;
+let attempted=data.tests.reduce((s,t)=>s+t.a,0);
+let correct=data.tests.reduce((s,t)=>s+t.c,0);
+let pct=attempted?(correct/attempted*100).toFixed(1):0;
+$('todayHours').textContent=Math.floor(data.seconds/60)+' min';
+$('totalHours').textContent=(data.seconds/3600).toFixed(2)+' hours';
+$('slotCount').textContent=data.done.length;
+$('syllPct').textContent=Math.round(total/count*100)+'%';
+$('accuracy').textContent=pct+'%';
+$('reportAccuracy').textContent=pct+'%';
+$('reportSyllabus').textContent=Math.round(total/count*100)+'%';
+}
+function backup(){
+let a=document.createElement('a');
+a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));
+a.download='Mourya-APPSC-backup.json';a.click();
+}
+function restoreBackup(e){
+let f=e.target.files[0];if(!f)return;
+let r=new FileReader();
+r.onload=()=>{try{data=JSON.parse(r.result);save();renderSlots();renderTopics();renderTests();alert('Backup restored')}catch{alert('Invalid backup')}};
+r.readAsText(f);
+}
+renderSlots();renderTopics();renderTests();update();
+</script>
+</body>
+                                </html>
+                                
